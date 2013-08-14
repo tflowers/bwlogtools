@@ -6,6 +6,7 @@ bwxslogtool.py -- This tool parses sip messages out of the broadworks App Server
 USAGE
 =====
 
+```
 usage: bwxslogtool.py [-h] [-p FILENAME] [-m REGEX] [--bwip BWIP] XSLog
 
 currently this tool prints sip logs to STDOUT that match the
@@ -23,7 +24,7 @@ optional arguments:
                         Pattern to match
   --bwip BWIP           ip address of the broadworks server to be used when
                         writing to pcap files
-
+```
 
 
 NOTES
