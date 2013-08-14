@@ -1,0 +1,4 @@
+* Error handeling:  Currently I am not really doing any, should be easy to improve
+* Allow support for non-sip logs
+* Fix the file parser method, while it seems to work, I think it is going to be buggy!
+* Maybe add an option for generating sipp scenario files...
