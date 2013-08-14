@@ -31,6 +31,6 @@ NOTES
 
 This has been tested on various flavors of linux (Redhat, Ubuntu, SUSE) as well as OSX.  I have not tested on windows, but welcome any feedback.
 
-Unfortunately I had to use a third party library that is not included in the python standard libarary (scapy) so that will need to be included.
+Unfortunately I had to use a third party library that is not included in the python standard library (scapy) so that will need to be included.
 
 I will be maintaining this and adding any features that folks find useful, please report any bugs on github. 
