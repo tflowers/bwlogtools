@@ -22,9 +22,8 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 #from scapy import *
 from scapy.all import *
 
-
-
 VERSION=.01
+
 
 class XSLogEntry(object):
   _siplogfmt = re.compile(r'^(?:udp|tcp)(?:\ )'
@@ -48,7 +47,6 @@ class XSLogEntry(object):
     self.loglevel = loglevel
     self.logtype = logtype
     self.body = body
-  
 
   def __repr__(self):
     line = ''
@@ -130,10 +128,7 @@ class XSLog(object):
     if not regex: 
       return siplogs
     else:
-      print("regex: %s" % regex)
       return [siplog for siplog in siplogs if regex in siplog.sipmsg or re.match(regex, siplog.sipmsg)]
-      #return [siplog for siplog in siplogs if re.match(regex, siplog.sipmsg)]
-
 
   def to_pcap(self, filename, bwServerIp = '0.0.0.0', bwServerPort = 5060):
     siplogs = self.siplogs()
@@ -200,10 +195,6 @@ def main(argv):
   else:
     for log in siplogs:
       print log
-
-  
-  
- 
 
 
 if __name__ == '__main__':
