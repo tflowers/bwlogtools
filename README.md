@@ -29,9 +29,8 @@ optional arguments:
 
 NOTES
 =====
+My testing was done with python 2.7.  I got a little feedback that some users were having trouble with this script using python2.4 (apparently a lot of broadworks users only have python 2.4 installed).  I'm working on a branch that will address those issues.
+
 
 This has been tested on various flavors of linux (Redhat, Ubuntu, SUSE) as well as OSX.  I have not tested on windows, but welcome any feedback.
-
-Unfortunately I had to use a third party library that is not included in the python standard library (scapy) so that will need to be included.
-
-I will be maintaining this and adding any features that folks find useful, please report any bugs on github. 
+Unfortunately I had to use a third party library that is not included in the python standard library (scapy) so that will need to be included. I will be maintaining this and adding any features that folks find useful, please report any bugs on github. 
