@@ -313,8 +313,8 @@ def parse_argv():
   try:
     opts, args = getopt.getopt(sys.argv[1:], "hp:m:",
                           ["pcap=", "match=", "bwip="])
-  except getopt.GetoptError as err:
-    print(str(err))
+  except getopt.GetoptError:
+    print("Error parsing command line options:")
     usage()
     sys.exit()
 
