@@ -10,20 +10,130 @@
 
 import re
 import sys
-import argparse
 from itertools import groupby
 from datetime import datetime
+import time
+import struct
+import socket
 
-# setup scapy logging to get rid of the ipv6 log
-import logging
-logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
-#NOTE if using scapy v1 you will need to switch this to:
-#from scapy import *
-from scapy.all import *
+import argparse
 
 VERSION=.01
 
+#----------------------------------------------------------------------------
+#  I had enought people that had issues with scapy that I decided to roll my 
+#  own pcap writing tool... This is a little ugly, but if folks like it i'll
+#  clean it up ;-)
+#----------------------------------------------------------------------------
+
+class Packet(object):
+  """
+  This is my packet class:  Currently almost everything is hard-coded, and it's EXTREMELY INFLEXABLE.
+  this will be cleaned up when I get around to it depending on how well this idea pans out.
+  """
+  def __init__(self, src='0.0.0.0', dst='0.0.0.0', sport=0, dport=0, data=None):
+    self.src = src
+    self.dst = dst
+    self.sport = sport
+    self.dport = dport
+    self.data = data
+
+  def udp_header(self):
+    ulen = 8 + len(self.data)
+    checksum = 0
+    return struct.pack('!HHHH', self.sport, self.dport, ulen, checksum)
+
+  def ip_header(self):
+    version = 4
+    ihl = 5
+    ihl_ver = (version << 4) + ihl
+    dscp = 0
+    tot_len = 20 + len(self.udp_header()) + len(self.data)
+    ident = 1
+    flags = None
+    f_offset = 0
+    ttl = 64
+    protocol = socket.IPPROTO_UDP
+
+    checksum = 0 #TODO:  FILL THIS THE FUCK IN :)
+    saddr = socket.inet_aton(self.src)
+    daddr = socket.inet_aton(self.dst)
+
+    return struct.pack('!BBHHHBBH4s4s', ihl_ver, dscp, tot_len, ident,
+                        f_offset, ttl, protocol,  checksum, saddr, daddr)
+
+  def checksum(data):
+    l = len(data)
+    s = 0
+    for i in range(0, l, 2):
+      part = data[i:i+2]
+      val = int(part.encode('hex'), 16)
+      s = (s + val) % 0xFFFF
+    s = ~s & 0xFFFF
+    return struct.pack('>H', s)
+
+  def __repr__(self):
+    return str(self.ip_header() + self.udp_header() + self.data)
+
+
+
+class PcapWriter(object):
+  def __init__(self, filename, network=101 ):
+    """
+    initialize the pcap writer, and write the libpcap header to the file
+    Used the following documentation to create this:
+    http://wiki.wireshark.org/Development/LibpcapFileFormat
+    """
+    self.magic_number = 0xa1b2c3d4L
+    self.version_major = 2 # versoin 2.4
+    self.version_minor = 4 # version 2.4
+    self.thiszone = 0
+    self.sigfigs = 0
+    self.snaplen = 65535
+    self.network = network #Link Layer Type (default 101)
+    self.pcap_header = struct.pack('@IHHIIII', self.magic_number,
+                                   self.version_major, self.version_minor,
+                                   self.thiszone, self.sigfigs, self.snaplen,
+                                   self.network)
+    self.f = open(filename, 'wb')
+
+    self.f.write(self.pcap_header)
+
+  def close(self):
+    self.f.close()
+
+  def write(self, pkt, ts=None):
+    """
+    Writes single binarary packet to pcap file,
+    Used the following documentation to create this:
+    should probably be called something like this for list of packets
+
+    map(write, packets)
+
+    or
+
+    for packet in packets:
+      write(packet)
+
+    If there is a timestamp it should be in sec.usec format ;-),
+    and it can be passed as an optional parameter
+
+    http://wiki.wireshark.org/Development/LibpcapFileFormat
+    """
+    incl_len = len(pkt)
+    orig_len = incl_len
+
+    if not ts:
+      ts = time.time()
+    ts_sec = int(ts)
+    ts_usec = int(((ts)-ts_sec)*1000000)
+    packet_header = struct.pack('@IIII', ts_sec, ts_usec, incl_len, orig_len)
+    self.f.write(packet_header)
+    self.f.write(pkt)
+
+  def __del__(self):
+    self.f.close()
 
 class XSLogEntry(object):
   _siplogfmt = re.compile(r'^(?:udp|tcp)(?:\ )'
@@ -58,8 +168,6 @@ class XSLogEntry(object):
     repr_str += line + "\n" + self.body
 
     return repr_str
-    #return (str(self.datetime) + " " + self.loglevel + " " + self.logtype + ":"
-    #        "\n" + "\"" + self.body + "\"" )
     
 
   def type(self):
@@ -133,7 +241,9 @@ class XSLog(object):
   def to_pcap(self, filename, bwServerIp = '0.0.0.0', bwServerPort = 5060):
     siplogs = self.siplogs()
     plist = []
+    pw = PcapWriter(filename)
     for siplog in siplogs:
+      dt = siplog.datetime
       if siplog.direction == 'IN':
         saddr, sport = siplog.ipaddr, int(siplog.port)
         daddr, dport = bwServerIp, bwServerPort
@@ -141,15 +251,12 @@ class XSLog(object):
         saddr, sport = bwServerIp, bwServerPort
         daddr, dport = siplog.ipaddr, int(siplog.port)
 
-      #ether = Ether()
-      ip = IP(src=saddr, dst=daddr)
-      udp = UDP(sport=sport, dport=dport)
-      payload = siplog.sipmsg
-      packet = ip/udp/payload
-      packet.time = float(siplog.datetime.strftime("%s.%f"))
-      plist.append(packet)
-    wrpcap(filename, plist)
-
+      print dt.microsecond
+      ts = float(str(dt.strftime("%s")) + '.' + str(dt.microsecond))
+      print("TS IS %s" % ts)
+      pkt = Packet(saddr, daddr, sport, dport, siplog.sipmsg)
+      pw.write(str(pkt), ts)
+    pw.close()
 
   def parser(self, fn):
     groups = []
