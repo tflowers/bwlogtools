@@ -8,6 +8,7 @@
 #----------------------------------------------------------------------------
 
 
+import os.path
 import re
 import sys
 from itertools import groupby
@@ -15,11 +16,9 @@ from datetime import datetime
 import time
 import struct
 import socket
+import getopt
 
-
-import argparse
-
-VERSION=.01
+VERSION=.02
 
 #----------------------------------------------------------------------------
 #  I had enought people that had issues with scapy that I decided to roll my 
@@ -60,10 +59,15 @@ class Packet(object):
     saddr = socket.inet_aton(self.src)
     daddr = socket.inet_aton(self.dst)
 
-    return struct.pack('!BBHHHBBH4s4s', ihl_ver, dscp, tot_len, ident,
-                        f_offset, ttl, protocol,  checksum, saddr, daddr)
+    ip_header = struct.pack('!BBHHHBBH4s4s', ihl_ver, dscp, tot_len, ident,
+                             f_offset, ttl, protocol,  checksum, saddr, daddr)
 
-  def checksum(data):
+    checksum = self.checksum(ip_header)
+    ip_header = list(ip_header)
+    ip_header[10:12] = checksum
+    return "".join(ip_header)
+
+  def checksum(self, data):
     l = len(data)
     s = 0
     for i in range(0, l, 2):
@@ -203,7 +207,7 @@ class SipXSLogEntry(XSLogEntry):
   def __init__(self, datetime=None, loglevel=None, 
                logtype=None, body=None, siplog=None):
     super(SipXSLogEntry, self).__init__(datetime, loglevel, logtype, body)
-    self.sipmsg = siplog['sipmsg']
+    self.sipmsg = siplog['sipmsg'] + "\r\n"
     self.direction = siplog['direction']
     self.ipaddr = siplog['ipaddr']
     self.port = siplog['port']
@@ -218,7 +222,7 @@ class XSLog(object):
   """
   XSLog  Parses Broadworks XSLog files into a list of logs
   """
-  
+
   _logstart = re.compile(r'^[0-9]{4}\.[0-9]{2}\.[0-9]{2}')
 
   def __init__(self, fn):
@@ -238,8 +242,9 @@ class XSLog(object):
     else:
       return [siplog for siplog in siplogs if regex in siplog.sipmsg or re.match(regex, siplog.sipmsg)]
 
-  def to_pcap(self, filename, bwServerIp = '0.0.0.0', bwServerPort = 5060):
-    siplogs = self.siplogs()
+  def to_pcap(self, filename, bwServerIp = '0.0.0.0', bwServerPort = 5060, siplogs = None):
+    if not siplogs:
+      siplogs = self.siplogs()
     plist = []
     pw = PcapWriter(filename)
     for siplog in siplogs:
@@ -250,10 +255,7 @@ class XSLog(object):
       else:
         saddr, sport = bwServerIp, bwServerPort
         daddr, dport = siplog.ipaddr, int(siplog.port)
-
-      print dt.microsecond
       ts = float(str(dt.strftime("%s")) + '.' + str(dt.microsecond))
-      print("TS IS %s" % ts)
       pkt = Packet(saddr, daddr, sport, dport, siplog.sipmsg)
       pw.write(str(pkt), ts)
     pw.close()
@@ -279,28 +281,89 @@ class XSLog(object):
     rawlogs =  zip(keys, groups)
     return [XSLogEntry.factory(rl) for rl in rawlogs]
 
-def main(argv):
-  parser = argparse.ArgumentParser(description='bwXSLog tool, currently '
-    +'this tool prints sip logs to STDOUT that match the pattern defined '
-    +'in the -m option, or if -p is specified it will print the sip messages '
-    +'to the specified pcap file')
-  parser.add_argument('-p', '--pcap', nargs=1, metavar='FILENAME', help='PCAP file to write logs to.')
-  parser.add_argument('-m', '--match', nargs=1, metavar='REGEX', help='Pattern to match')
-  parser.add_argument('--bwip', nargs=1, metavar='BWIP', 
-                      help='ip address of the broadworks server to be used when writing to pcap files')
-  parser.add_argument('XSLog', nargs=1, help='XSLog to parse')
-  args = parser.parse_args()
-  
-  xslog = XSLog(str(args.XSLog[0]))
 
-  if args.match:
-    siplogs = xslog.siplogs(args.match[0])
+
+def usage():
+  usage_str = """
+usage: arg.py [-h] [-p FILENAME] [-m REGEX] [--bwip BWIP] XSLog
+
+bwXSLog tool, currently this tool prints sip logs to STDOUT that match the
+pattern defined in the -m option, or if -p is specified it will print the sip
+messages to the specified pcap file
+
+positional arguments:
+  XSLog                 XSLog to parse
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p FILENAME, --pcap FILENAME
+                        PCAP file to write logs to.
+  -m REGEX, --match REGEX
+                        Pattern to match
+  --bwip BWIP           ip address of the broadworks server to be used when
+                        writing to pcap files
+
+"""
+  print(usage_str)
+
+
+def parse_argv():
+
+  arg_dict = {}
+  try:
+    opts, args = getopt.getopt(sys.argv[1:], "hp:m:",
+                          ["pcap=", "match=", "bwip="])
+  except getopt.GetoptError as err:
+    print(str(err))
+    usage()
+    sys.exit()
+
+  for o, a in opts:
+    if o == "-h":
+      usage()
+      sys.exit()
+    elif o in ("-p", "--pcap"):
+      arg_dict['pcap'] = a
+    elif o in ("-m", "--match"):
+      arg_dict['match'] = a
+    elif o == "--bwip":
+      arg_dict['bwip'] = a
+    else:
+      assert False, "unhandled option"
+
+  if len(args) != 1:
+    print("Error: XSLog not specified!")
+    usage()
+    sys.exit()
+
+  arg_dict['XSLog'] = args[0]
+  return arg_dict
+
+
+
+
+def main(argv):
+  args = parse_argv()
+  
+  if not os.path.isfile(args['XSLog']): 
+    print("ERROR:  Cannot open XSLog: %s" % args['XSLog'])
+    usage()
+    sys.exit()
+
+  try:
+    xslog = XSLog(str(args['XSLog']))
+  except:
+    print("ERROR: unable to parse XSLog: %s" % args['XSLog'])
+    sys.exit()
+
+  if 'match' in args:
+    siplogs = xslog.siplogs(args['match'])
   else:
     siplogs = xslog.siplogs()
 
-  if args.pcap:
-    if args.bwip: xslog.to_pcap(args.pcap[0], args.bwip[0])
-    else: xslog.to_pcap(args.pcap[0])
+  if 'pcap' in args:
+    if 'bwip' in args: xslog.to_pcap(args['pcap'], args['bwip'], siplogs=siplogs)
+    else: xslog.to_pcap(args['pcap'], siplogs=siplogs)
   else:
     for log in siplogs:
       print log
