@@ -261,7 +261,8 @@ class XSLog(object):
   def parser(self, fn):
     groups = []
     keys = []
-    with open(fn) as f:
+    try:
+      f = open(fn, 'r')
       tmp = f.next()
       while not self._logstart.match(tmp):
         tmp = f.next()
@@ -269,7 +270,8 @@ class XSLog(object):
       for key, group in groupby(f, self._logstart.match):
         if key: keys.append(list(group))
         else: groups.append(list(group))
-    f.close()
+    finally:
+      f.close()
     #This assumes that the parser gets a group entry for each key,
     #this may be error prone, but so far seems to work.
     keys = ["".join(k).strip() for k in keys]
