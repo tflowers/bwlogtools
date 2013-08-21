@@ -21,8 +21,8 @@ import getopt
 VERSION=.02
 
 #----------------------------------------------------------------------------
-#  I had enought people that had issues with scapy that I decided to roll my 
-#  own pcap writing tool... This is a little ugly, but if folks like it i'll
+#  Enough people complained about issues with scapy that I decided to roll my 
+#  own pcap writing tool... This is a little ugly, but if folks like it,  i'll
 #  clean it up ;-)
 #----------------------------------------------------------------------------
 
