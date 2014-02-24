@@ -55,7 +55,7 @@ class Packet(object):
     ttl = 64
     protocol = socket.IPPROTO_UDP
 
-    checksum = 0 #TODO:  FILL THIS THE FUCK IN :)
+    checksum = 0 #TODO:  FILL THIS IN :)
     saddr = socket.inet_aton(self.src)
     daddr = socket.inet_aton(self.dst)
 
