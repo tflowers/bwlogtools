@@ -23,7 +23,7 @@ VERSION=.02
 #----------------------------------------------------------------------------
 #  Enough people complained about issues with scapy that I decided to roll my 
 #  own pcap writing tool... This is a little ugly, but if folks like it,  i'll
-#  clean it up ;-)
+#  clean it up 
 #----------------------------------------------------------------------------
 
 class Packet(object):
@@ -55,7 +55,7 @@ class Packet(object):
     ttl = 64
     protocol = socket.IPPROTO_UDP
 
-    checksum = 0 #TODO:  FILL THIS IN :)
+    checksum = 0
     saddr = socket.inet_aton(self.src)
     daddr = socket.inet_aton(self.dst)
 
@@ -281,8 +281,6 @@ class XSLog(object):
     rawlogs =  zip(keys, groups)
     return [XSLogEntry.factory(rl) for rl in rawlogs]
 
-
-
 def usage():
   usage_str = """
 usage: arg.py [-h] [-p FILENAME] [-m REGEX] [--bwip BWIP] XSLog
@@ -305,7 +303,6 @@ optional arguments:
 
 """
   print(usage_str)
-
 
 def parse_argv():
 
@@ -338,10 +335,7 @@ def parse_argv():
 
   arg_dict['XSLog'] = args[0]
   return arg_dict
-
-
-
-
+  
 def main(argv):
   args = parse_argv()
   
@@ -360,7 +354,6 @@ def main(argv):
     siplogs = xslog.siplogs(args['match'])
   else:
     siplogs = xslog.siplogs()
-
   if 'pcap' in args:
     if 'bwip' in args: xslog.to_pcap(args['pcap'], args['bwip'], siplogs=siplogs)
     else: xslog.to_pcap(args['pcap'], siplogs=siplogs)
